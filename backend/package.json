@@ -1,0 +1,13 @@
+{
+  "name": "arise-backend",
+  "version": "1.0.0",
+  "description": "Backend for the Arise volunteer site — serves the frontend and stores volunteer signups.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "firebase-admin": "^14.1.0"
+  }
+}
