@@ -12,6 +12,27 @@ admin.initializeApp({
 const db = admin.firestore();
 const volunteersRef = db.collection('volunteers');
 
+const ADMIN_USER = process.env.ADMIN_USER || 'admin';
+const ADMIN_PASS = process.env.ADMIN_PASS || 'changeme';
+
+function requireAdmin(req, res, next) {
+  const header = req.headers.authorization || '';
+  const [scheme, encoded] = header.split(' ');
+
+  if (scheme === 'Basic' && encoded) {
+    const decoded = Buffer.from(encoded, 'base64').toString('utf-8');
+    const sepIndex = decoded.indexOf(':');
+    const user = decoded.slice(0, sepIndex);
+    const pass = decoded.slice(sepIndex + 1);
+    if (user === ADMIN_USER && pass === ADMIN_PASS) {
+      return next();
+    }
+  }
+
+  res.set('WWW-Authenticate', 'Basic realm="Arise admin"');
+  return res.status(401).send('Authentication required.');
+}
+
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '..', 'frontend')));
 
@@ -42,15 +63,26 @@ app.post('/api/volunteers', async (req, res) => {
   }
 });
 
-app.get('/api/volunteers', async (req, res) => {
+app.get('/api/volunteers', requireAdmin, async (req, res) => {
   try {
     const snapshot = await volunteersRef.orderBy('submittedAt', 'desc').get();
-    const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const list = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        submittedAt: data.submittedAt ? data.submittedAt.toDate().toISOString() : null
+      };
+    });
     res.json(list);
   } catch (err) {
     console.error('Failed to fetch volunteers:', err);
     res.status(500).json({ error: 'Failed to fetch signups' });
   }
+});
+
+app.get('/admin', requireAdmin, (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'frontend', 'admin.html'));
 });
 
 app.listen(PORT, () => {

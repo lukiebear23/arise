@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Arise — Volunteer signups</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0F1729; --paper:#FBF6EC; --coral:#FF6B4A; --coral-dark:#D6472A;
+    --ink-text:#1C2438; --ink-soft:#5A6480; --border:rgba(28,36,56,0.12);
+    --font-body:'Inter', system-ui, sans-serif; --font-mono:'Space Mono', monospace;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:var(--font-body); background:var(--paper); color:var(--ink-text);
+    padding:40px 24px 80px;
+  }
+  .wrap{max-width:1080px; margin:0 auto;}
+  header{display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:28px;}
+  h1{font-size:1.6rem; margin:0; font-weight:600;}
+  .count{font-family:var(--font-mono); color:var(--ink-soft); font-size:0.9rem;}
+  .toolbar{display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap; align-items:center;}
+  input[type=search]{
+    flex:1; min-width:220px; padding:10px 14px; border-radius:10px; border:1.5px solid var(--border);
+    font-family:var(--font-body); font-size:0.95rem; background:#fff;
+  }
+  button{
+    padding:10px 18px; border-radius:10px; border:1.5px solid var(--border); background:#fff;
+    font-family:var(--font-body); font-weight:600; font-size:0.9rem; cursor:pointer;
+  }
+  button:hover{background:var(--paper);}
+  table{width:100%; border-collapse:collapse; background:#fff; border-radius:14px; overflow:hidden; box-shadow:0 1px 0 var(--border);}
+  th, td{text-align:left; padding:14px 16px; border-bottom:1px solid var(--border); font-size:0.92rem; vertical-align:top;}
+  th{
+    background:var(--ink); color:#F5F1E6; font-family:var(--font-mono); font-size:0.72rem;
+    text-transform:uppercase; letter-spacing:0.06em; font-weight:400;
+  }
+  tr:last-child td{border-bottom:none;}
+  tr:hover td{background:#FCFAF4;}
+  .tag{
+    display:inline-block; background:rgba(255,107,74,0.12); color:var(--coral-dark);
+    font-size:0.78rem; padding:2px 9px; border-radius:100px; margin:2px 4px 2px 0;
+  }
+  .muted{color:var(--ink-soft);}
+  .empty, .error, .loading{padding:60px 20px; text-align:center; color:var(--ink-soft);}
+  .error{color:var(--coral-dark);}
+  a.mail{color:var(--coral-dark); text-decoration:none;}
+  a.mail:hover{text-decoration:underline;}
+  @media (max-width:720px){
+    table, thead, tbody, th, td, tr{display:block;}
+    thead{display:none;}
+    tr{background:#fff; border-radius:12px; margin-bottom:14px; padding:6px 4px; box-shadow:0 1px 0 var(--border);}
+    td{border-bottom:none; padding:8px 14px;}
+    td::before{
+      content:attr(data-label); display:block; font-family:var(--font-mono); font-size:0.68rem;
+      text-transform:uppercase; letter-spacing:0.05em; color:var(--ink-soft); margin-bottom:3px;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Volunteer signups</h1>
+    <span class="count" id="count"></span>
+  </header>
+
+  <div class="toolbar">
+    <input type="search" id="search" placeholder="Search by name, email, or area">
+    <button id="refreshBtn">Refresh</button>
+    <button id="exportBtn">Export CSV</button>
+  </div>
+
+  <div id="content"><div class="loading">Loading signups…</div></div>
+</div>
+
+<script>
+let allRows = [];
+
+function esc(s) {
+  return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function formatDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+function render(rows) {
+  const content = document.getElementById('content');
+  document.getElementById('count').textContent = rows.length + (rows.length === 1 ? ' signup' : ' signups');
+
+  if (!rows.length) {
+    content.innerHTML = '<div class="empty">No signups match yet.</div>';
+    return;
+  }
+
+  const body = rows.map(r => `
+    <tr>
+      <td data-label="Name">${esc(r.fullName)}</td>
+      <td data-label="Contact">
+        <a class="mail" href="mailto:${esc(r.email)}">${esc(r.email)}</a>
+        ${r.phone ? `<div class="muted">${esc(r.phone)}</div>` : ''}
+      </td>
+      <td data-label="Area">${esc(r.area) || '<span class="muted">—</span>'}</td>
+      <td data-label="Interests">${(r.interests || []).map(i => `<span class="tag">${esc(i)}</span>`).join('') || '<span class="muted">—</span>'}</td>
+      <td data-label="Availability">${esc(r.availability) || '<span class="muted">—</span>'}</td>
+      <td data-label="Message">${esc(r.message) || '<span class="muted">—</span>'}</td>
+      <td data-label="Submitted"><span class="muted">${formatDate(r.submittedAt)}</span></td>
+    </tr>
+  `).join('');
+
+  content.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th><th>Contact</th><th>Area</th><th>Interests</th>
+          <th>Availability</th><th>Message</th><th>Submitted</th>
+        </tr>
+      </thead>
+      <tbody>${body}</tbody>
+    </table>
+  `;
+}
+
+function applyFilter() {
+  const q = document.getElementById('search').value.trim().toLowerCase();
+  if (!q) return render(allRows);
+  const filtered = allRows.filter(r =>
+    (r.fullName || '').toLowerCase().includes(q) ||
+    (r.email || '').toLowerCase().includes(q) ||
+    (r.area || '').toLowerCase().includes(q)
+  );
+  render(filtered);
+}
+
+async function load() {
+  document.getElementById('content').innerHTML = '<div class="loading">Loading signups…</div>';
+  try {
+    const res = await fetch('/api/volunteers');
+    if (!res.ok) throw new Error('Request failed: ' + res.status);
+    allRows = await res.json();
+    applyFilter();
+  } catch (err) {
+    document.getElementById('content').innerHTML = '<div class="error">Could not load signups. Refresh to try again.</div>';
+  }
+}
+
+function exportCsv() {
+  const cols = ['fullName', 'email', 'phone', 'area', 'interests', 'availability', 'message', 'submittedAt'];
+  const header = cols.join(',');
+  const rows = allRows.map(r => cols.map(c => {
+    let v = r[c];
+    if (Array.isArray(v)) v = v.join('; ');
+    v = String(v ?? '').replace(/"/g, '""');
+    return `"${v}"`;
+  }).join(','));
+  const csv = [header, ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'arise-volunteers.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+document.getElementById('search').addEventListener('input', applyFilter);
+document.getElementById('refreshBtn').addEventListener('click', load);
+document.getElementById('exportBtn').addEventListener('click', exportCsv);
+
+load();
+</script>
+</body>
+</html>
